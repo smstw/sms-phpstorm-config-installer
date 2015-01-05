@@ -1,0 +1,11 @@
+{
+    "alias": "phpstorm-config-installer.phar",
+    "chmod": "0755",
+    "directories": ["res"],
+    "extract": true,
+    "git-commit": "git-commit",
+    "git-version": "git-version",
+    "main": "main.php",
+    "output": "phpstorm-config-installer-@git-version@.phar",
+    "stub": true
+}
