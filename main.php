@@ -18,7 +18,7 @@ installConfigFiles();
 function installConfigFiles()
 {
 	$sourceDir = __DIR__ . '/res/config';
-	$targetDir = getTargetDir() . '/config';
+	$targetDir = getTargetDir();
 
 	if (!is_dir($sourceDir))
 	{
@@ -30,13 +30,9 @@ function installConfigFiles()
 		error(sprintf('"%s" Target directory is not exists.', $targetDir));
 	}
 
-	// Source => Target
-	$files = array(
-		$sourceDir . '/codestyles/SMSTW_Joomla.xml' => $targetDir . '/codestyles/SMSTW_Joomla.xml',
-	);
-
-	foreach ($files as $sourceFile => $targetFile)
+	foreach (loadConfigFromGitHub() as $target => $config)
 	{
+		$targetFile = $targetDir . '/' . $target;
 		$dir = dirname($targetFile);
 
 		if (! is_dir($dir))
@@ -44,10 +40,32 @@ function installConfigFiles()
 			mkdir($dir, 0755, true);
 		}
 
-		file_put_contents($targetFile, file_get_contents($sourceFile));
+		file_put_contents($targetFile, $config);
 
-		printf("%s => %s\n", $sourceFile, $targetFile);
+		printf("%s => %s\n", $target, $targetFile);
 	}
+}
+
+/**
+ * Load config from GitHub repository
+ *
+ * @return  array
+ */
+function loadConfigFromGitHub()
+{
+	$urlPrefix = 'https://raw.githubusercontent.com/smstw/sms-phpstorm-config-installer/master/res/';
+	$files = file($urlPrefix . 'config-file-list.txt');
+	$configs = [];
+
+	foreach ($files as $file)
+	{
+		$file = str_replace("\n", '', $file);
+		$file = trim($file);
+		
+		$configs[$file] = file_get_contents($urlPrefix . $file);
+	}
+
+	return $configs;
 }
 
 /**
