@@ -136,12 +136,12 @@ class Application
 		elseif (preg_match('#^Linux#i', $os))
 		{
 			// Linux path
-			$configPath = '~/.' . $folderName;
+			$configPath = getenv('HOME') . '/' . $folderName;
 		}
 		else
 		{
 			// Mac OSX path
-			$configPath = $_SERVER['HOME'] . '/Library/Preferences/' . $folderName;
+			$configPath = getenv('HOME') . '/Library/Preferences/' . $folderName;
 		}
 
 		return $configPath;
