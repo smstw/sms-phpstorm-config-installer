@@ -7,176 +7,361 @@
  * @license    GNU General Public License version 2 or later; see LICENSE
  */
 
-validateCommands();
-installConfigFiles();
+// Force strict mode
+error_reporting(32767);
+
+$app = new Application;
+
+$app->execute();
 
 /**
- * installConfigFiles
- *
- * @return void
+ * The Application class.
  */
-function installConfigFiles()
+class Application
 {
-	$sourceDir = __DIR__ . '/res/config';
-	$targetDir = getTargetDir();
+	/**
+	 * Property calledScript.
+	 *
+	 * @var string
+	 */
+	protected $calledScript;
 
-	if (!is_dir($sourceDir))
+	/**
+	 * Property args.
+	 *
+	 * @var  array
+	 */
+	protected $args = array();
+
+	/**
+	 * Property options.
+	 *
+	 * @var  array
+	 */
+	protected $options = array();
+
+	/**
+	 * Execute this application.
+	 *
+	 * @return  void
+	 */
+	public function execute()
 	{
-		error(sprintf('"%s" Source directory is not exists.', $sourceDir));
+		// Prepare
+		$this->registerException();
+		$this->parseArguments();
+
+		// Start logic
+		$this->validateCommands();
+		$this->installConfigFiles();
 	}
 
-	if (!is_dir($targetDir))
+	/**
+	 * Install Config Files.
+	 *
+	 * @return void
+	 */
+	protected function installConfigFiles()
 	{
-		error(sprintf('"%s" Target directory is not exists.', $targetDir));
-	}
+		$sourceDir = __DIR__ . '/res/config';
+		$targetDir = $this->getTargetDir();
 
-	foreach (loadConfigFromGitHub() as $target => $config)
-	{
-		$targetFile = $targetDir . '/' . $target;
-		$dir = dirname($targetFile);
-
-		if (! is_dir($dir))
+		if (!is_dir($sourceDir))
 		{
-			mkdir($dir, 0755, true);
+			throw new \RuntimeException(sprintf('"%s" Source directory is not exists.', $sourceDir));
 		}
 
-		file_put_contents($targetFile, $config);
-
-		printf("%s => %s\n", $target, $targetFile);
-	}
-}
-
-/**
- * Load config from GitHub repository
- *
- * @return  array
- */
-function loadConfigFromGitHub()
-{
-	$urlPrefix = 'https://raw.githubusercontent.com/smstw/sms-phpstorm-config-installer/master/res/';
-	$files = file($urlPrefix . 'config-file-list.txt');
-	$configs = [];
-
-	foreach ($files as $file)
-	{
-		$file = str_replace("\n", '', $file);
-		$file = trim($file);
-		
-		$configs[$file] = file_get_contents($urlPrefix . $file);
-	}
-
-	return $configs;
-}
-
-/**
- * Get target directory
- *
- * @return string|bool Return false when the target directory is not exists.
- */
-function getTargetDir()
-{
-	$options = getOptions();
-
-	$folderName = 'WebIde' . str_pad($options['ide-version'], 2, 0);
-	$os = php_uname();
-
-	if (preg_match('#^Windows#i', $os))
-	{
-		// Windows path
-		$configPath = getenv('HOMEDRIVE') . getenv("HOMEPATH") . '\\.' . $folderName;
-	}
-	elseif (preg_match('#^Linux#i', $os))
-	{
-		// Linux path
-		$configPath = '~/.' . $folderName;
-	}
-	else
-	{
-		// Mac OSX path
-		$configPath = '~/Library/Preferences/' . $folderName;
-	}
-
-	return $configPath;
-}
-
-/**
- * Validate command arguments
- *
- * @return void
- */
-function validateCommands()
-{
-	if (!isset($_SERVER['argv'][1])
-		|| 'install' !== $_SERVER['argv'][1])
-	{
-		echo usage();
-		exit;
-	}
-}
-
-/**
- * Get options
- *
- * @return array
- */
-function getOptions()
-{
-	$argv = $_SERVER['argv'];
-	$options = array();
-	$max = count($argv);
-
-	$options['ide-version'] = 8;
-
-	for ($i = 0; $i < $max; ++$i)
-	{
-		$arg = $argv[$i];
-
-		if (preg_match('/^\-\-ide\-version=/i', $arg))
+		if (!is_dir($targetDir))
 		{
-			list(, $value) = explode('=', $arg, 2);
-
-			$options['ide-version'] = $value;
+			throw new \RuntimeException(sprintf('"%s" Target directory is not exists.', $targetDir));
 		}
 
-		if ('-i' === $arg)
+		foreach ($this->loadConfigFromGitHub() as $target => $config)
 		{
-			++$i;
-			$value = $argv[$i];
+			$targetFile = $targetDir . '/' . $target;
+			$dir = dirname($targetFile);
 
-			$options['ide-version'] = $value;
+			if (! is_dir($dir))
+			{
+				mkdir($dir, 0755, true);
+			}
+
+			file_put_contents($targetFile, $config);
+
+			$this->out(sprintf("%s => %s", $target, $targetFile));
 		}
 	}
 
-	return $options;
-}
+	/**
+	 * Load config from GitHub repository
+	 *
+	 * @return  array
+	 */
+	protected function loadConfigFromGitHub()
+	{
+		$this->out('Downloading config files...');
 
-/**
- * Show command usage
- *
- * @return string
- */
-function usage()
-{
-	return <<<EOF
+		$urlPrefix = 'https://raw.githubusercontent.com/smstw/sms-phpstorm-config-installer/master/res/';
+		$files = file($urlPrefix . 'config-file-list.txt');
+		$configs = [];
+
+		foreach ($files as $file)
+		{
+			$file = str_replace("\n", '', $file);
+			$file = trim($file);
+
+			$configs[$file] = file_get_contents($urlPrefix . $file);
+		}
+
+		return $configs;
+	}
+
+	/**
+	 * Get target directory
+	 *
+	 * @return string|bool Return false when the target directory is not exists.
+	 */
+	protected function getTargetDir()
+	{
+		$version = $this->getOption('ide-version', $this->getOption('i', 8));
+
+		$folderName = 'WebIde' . str_pad($version, 2, 0);
+		$os = php_uname();
+
+		if (preg_match('#^Windows#i', $os))
+		{
+			// Windows path
+			$configPath = getenv('HOMEDRIVE') . getenv("HOMEPATH") . '\\.' . $folderName;
+		}
+		elseif (preg_match('#^Linux#i', $os))
+		{
+			// Linux path
+			$configPath = '~/.' . $folderName;
+		}
+		else
+		{
+			// Mac OSX path
+			$configPath = $_SERVER['HOME'] . '/Library/Preferences/' . $folderName;
+		}
+
+		return $configPath;
+	}
+
+	/**
+	 * Validate command arguments
+	 *
+	 * @return void
+	 */
+	protected function validateCommands()
+	{
+		if ('install' != $this->getArgument(0))
+		{
+			$this->out($this->usage());
+
+			exit;
+		}
+	}
+
+	/**
+	 * getOption
+	 *
+	 * @param string $key
+	 * @param mixed  $default
+	 *
+	 * @return  mixed
+	 */
+	public function getOption($key, $default = null)
+	{
+		if (isset($this->options[$key]))
+		{
+			return $this->options[$key];
+		}
+
+		return $default;
+	}
+
+	/**
+	 * getArgument
+	 *
+	 * @param string $offset
+	 * @param mixed  $default
+	 *
+	 * @return  mixed
+	 */
+	public function getArgument($offset, $default = null)
+	{
+		if (isset($this->args[$offset]))
+		{
+			return $this->args[$offset];
+		}
+
+		return $default;
+	}
+
+	/**
+	 * Show command usage
+	 *
+	 * @return string
+	 */
+	protected function usage()
+	{
+		return <<<EOF
 Usage: phpstorm-config-installer install [--ide-version|-i]
 
 Install all PhpStorm config files.
 
 Options:
-  --ide-version        -i PHPStorm version (Default is 8)
+  -i|--ide-version    PHPStorm version (Default is 8)
+  -v                  More details to debug
+
 EOF;
-}
+	}
 
-/**
- * Show error messages
- *
- * @param string $message
- *
- * @return void
- */
-function error($message)
-{
-	echo $message . "\n";
+	/**
+	 * Show error messages
+	 *
+	 * @param \Exception|string $exception
+	 *
+	 * @return void
+	 */
+	public function error($exception)
+	{
+		if ($exception instanceof \Exception)
+		{
+			fputs(STDERR, $exception->getMessage());
 
-	exit;
+			if ($this->getOption('v'))
+			{
+				fputs(STDERR, $exception->getTraceAsString());
+			}
+		}
+		else
+		{
+			fputs(STDERR, $exception);
+		}
+
+		exit;
+	}
+
+	/**
+	 * out
+	 *
+	 * @param string $string
+	 * @param bool   $nl
+	 *
+	 * @return  $this
+	 */
+	public function out($string = '', $nl = true)
+	{
+		$br = $nl ? "\n" : null;
+
+		fputs(STDOUT, $string . $br);
+
+		return $this;
+	}
+
+	/**
+	 * registerException
+	 *
+	 * @return  void
+	 */
+	protected function registerException()
+	{
+		restore_exception_handler();
+		set_exception_handler(array($this, 'error'));
+	}
+
+	/**
+	 * Initialise the options and arguments
+	 *
+	 * @return  void
+	 *
+	 * @see     https://github.com/ventoviro/windwalker-io/blob/master/Cli/Input/CliInput.php#L159
+	 */
+	protected function parseArguments()
+	{
+		$argv = $_SERVER['argv'];
+		$this->calledScript = array_shift($argv);
+		$out = array();
+
+		for ($i = 0, $j = count($argv); $i < $j; $i++)
+		{
+			$arg = $argv[$i];
+
+			// --foo --bar=baz
+			if (substr($arg, 0, 2) === '--')
+			{
+				$eqPos = strpos($arg, '=');
+
+				// --foo
+				if ($eqPos === false)
+				{
+					$key = substr($arg, 2);
+
+					// --foo value
+					if ($i + 1 < $j && $argv[$i + 1][0] !== '-')
+					{
+						$value = $argv[$i + 1];
+						$i++;
+					}
+					else
+					{
+						$value = isset($out[$key]) ? $out[$key] : true;
+					}
+
+					$out[$key] = $value;
+				}
+
+				// --bar=baz
+				else
+				{
+					$key       = substr($arg, 2, $eqPos - 2);
+					$value     = substr($arg, $eqPos + 1);
+					$out[$key] = $value;
+				}
+			}
+
+			// -k=value -abc
+			else
+			{
+				if (substr($arg, 0, 1) === '-')
+				{
+					// -k=value
+					if (substr($arg, 2, 1) === '=')
+					{
+						$key       = substr($arg, 1, 1);
+						$value     = substr($arg, 3);
+						$out[$key] = $value;
+					}
+
+					// -abc
+					else
+					{
+						$chars = str_split(substr($arg, 1));
+
+						foreach ($chars as $char)
+						{
+							$key       = $char;
+							$value     = isset($out[$key]) ? $out[$key] : true;
+							$out[$key] = $value;
+						}
+
+						// -a a-value
+						if ((count($chars) === 1) && ($i + 1 < $j) && ($argv[$i + 1][0] !== '-'))
+						{
+							$out[$key] = $argv[$i + 1];
+							$i++;
+						}
+					}
+				}
+				// plain-arg
+				else
+				{
+					$this->args[] = $arg;
+				}
+			}
+		}
+
+		$this->options = $out;
+	}
 }
