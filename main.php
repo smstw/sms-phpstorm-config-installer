@@ -280,88 +280,67 @@ EOF;
 	 */
 	protected function parseArguments()
 	{
-		$argv = $_SERVER['argv'];
-		$this->calledScript = array_shift($argv);
-		$out = array();
-
-		for ($i = 0, $j = count($argv); $i < $j; $i++)
-		{
-			$arg = $argv[$i];
-
-			// --foo --bar=baz
-			if (substr($arg, 0, 2) === '--')
-			{
-				$eqPos = strpos($arg, '=');
-
-				// --foo
-				if ($eqPos === false)
-				{
-					$key = substr($arg, 2);
-
-					// --foo value
-					if ($i + 1 < $j && $argv[$i + 1][0] !== '-')
-					{
-						$value = $argv[$i + 1];
-						$i++;
-					}
-					else
-					{
-						$value = isset($out[$key]) ? $out[$key] : true;
-					}
-
-					$out[$key] = $value;
-				}
-
-				// --bar=baz
-				else
-				{
-					$key       = substr($arg, 2, $eqPos - 2);
-					$value     = substr($arg, $eqPos + 1);
-					$out[$key] = $value;
-				}
-			}
-
-			// -k=value -abc
-			else
-			{
-				if (substr($arg, 0, 1) === '-')
-				{
-					// -k=value
-					if (substr($arg, 2, 1) === '=')
-					{
-						$key       = substr($arg, 1, 1);
-						$value     = substr($arg, 3);
-						$out[$key] = $value;
-					}
-
-					// -abc
-					else
-					{
-						$chars = str_split(substr($arg, 1));
-
-						foreach ($chars as $char)
-						{
-							$key       = $char;
-							$value     = isset($out[$key]) ? $out[$key] : true;
-							$out[$key] = $value;
-						}
-
-						// -a a-value
-						if ((count($chars) === 1) && ($i + 1 < $j) && ($argv[$i + 1][0] !== '-'))
-						{
-							$out[$key] = $argv[$i + 1];
-							$i++;
-						}
-					}
-				}
-				// plain-arg
-				else
-				{
-					$this->args[] = $arg;
-				}
-			}
-		}
-
-		$this->options = $out;
+	    $argv = $_SERVER['argv'];
+	    $this->calledScript = $argv[0];
+	    $out = array();
+	
+	    for ($i = 1, $max = count($argv); $i < $max; $i++)
+	    {
+	        $arg = $argv[$i];
+	        $nextArg = isset($argv[$i + 1]) ? $argv[$i + 1] : false;
+	        $nextArg = (false !== $nextArg && '-' !== $nextArg[0]) ? $nextArg : false;
+	        $type = '';
+	        $type = ('-' === substr($arg, 0, 1)) ? '-' : $type;
+	        $type = ('--' === substr($arg, 0, 2)) ? '--' : $type;
+	        $type = ('-' === $type && strpos($arg, '=')) ? '=' : $type;
+	        $type = ('--' === $type && strpos($arg, '=')) ? '==' : $type;
+	
+	        if (in_array($type, ['-', '--', '=', '==']))
+	        {
+	            $key = substr($arg, strlen($type));
+	            $type = empty($key) ? '' : $type;
+	
+	            // Case: "-abc" and "-f bar"
+	            if ('-' === $type)
+	            {
+	                if (1 === strlen($key))
+	                {
+	                    $out[$key] = (false === $nextArg) ?: $nextArg;
+	                    $i += (false === $nextArg ? 0 : 1);
+	                }
+	                else
+	                {
+	                    foreach (str_split($key) as $char)
+	                    {
+	                        $out[$char] = (false === isset($out[$char])) ?: $out[$char];
+	                    }
+	                }
+	            }
+	            // Case: "--foo" and "--foo bar"
+	            elseif ('--' === $type)
+	            {
+	                $out[$key] = (false === $nextArg) ?: $nextArg;
+	                $i += (false === $nextArg ? 0 : 1);
+	            }
+	            // Case: "-f=bar" ("-foo=bar" is the same as "-f=bar") and "--foo=bar"
+	            else
+	            {
+	                list($key, $value) = explode('=', $key, 2);
+	
+	                if (!empty($key))
+	                {
+	                    $key = ('=' === $type) ? $key[0] : $key;
+	
+	                    $out[$key] = $value;
+	                }
+	            }
+	        }
+	        else
+	        {
+	            $this->args[] = $arg;
+	        }
+	    }
+	
+	    $this->options = $out;
 	}
 }
