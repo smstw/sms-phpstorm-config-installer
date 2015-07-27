@@ -1,1 +1,2 @@
 config/codestyles/SMSTW_Joomla.xml
+codestyles/SMSTW_Joomla.xml
