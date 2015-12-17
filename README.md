@@ -1,4 +1,4 @@
-Download [sms-phpstorm-config-installer](https://github.com/smstw/sms-phpstorm-config-installer/releases/download/0.1.1/sms-phpstorm-config-installer.phar)
+Download [sms-phpstorm-config-installer](https://github.com/smstw/sms-phpstorm-config-installer/releases/download/0.1.2/sms-phpstorm-config-installer.phar)
 
 Run commands to install PhpStorm configs:
 
